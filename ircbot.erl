@@ -12,8 +12,6 @@
 -define(DEFAULT_PORT, 6667).
 -define(NICK, "jimm-erlang-bot").
 -define(FULL_NAME, "Jim's Erlang Bot").
--define(RANDOM_SIG_SCRIPT, "/Users/jimm/src/src/bin/randomSig.rb").
--define(RANDOM_SIG_ERROR, "Random sig not found. Sorry about that.").
 
 start() ->
     start("#jimm-test").
@@ -84,17 +82,10 @@ process_privmsg(Message, ReplyTo) ->
 %% Handle particular messages
 process_privmsg("hello", _Remainder, ReplyTo) ->
     {ok, "PRIVMSG " ++ ReplyTo ++ " :Well, hello to you too!"};
-process_privmsg("sig", _Remainder, ReplyTo) ->
-    {ok, "PRIVMSG " ++ ReplyTo ++ " :" ++ random_sig()};
 process_privmsg("quit", _Remainder, _ReplyTo) ->
     {quit, "QUIT :Goodbye from " ++ ?NICK};
 process_privmsg(_, _, _) ->
     noreply.
-
-random_sig() ->
-    String = os:cmd(?RANDOM_SIG_SCRIPT),
-    {ok, Sig, _N} = regexp:gsub(String, "\n", " "),
-    Sig.
 
 quit(Socket, QuitCommand) ->
     send(Socket, QuitCommand),
