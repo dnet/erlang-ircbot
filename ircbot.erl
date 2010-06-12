@@ -69,20 +69,50 @@ process(Data) ->
 process(Prefix, "PRIVMSG", Params) ->
     [To, Message] = Params,
     ReplyTo = privmsg_reply_to(Prefix, To),
-    process_privmsg(Message, ReplyTo);
+    process_privmsg(Message, ReplyTo, Prefix);
 process(_, _, _) ->
     noreply.
 
-process_privmsg(_, noreply) ->
+process_privmsg(_, noreply, _) ->
     noreply;
-process_privmsg(Message, ReplyTo) ->
+process_privmsg(Message, ReplyTo, Prefix) ->
     [H|T] = string:tokens(Message, " "),
-    process_privmsg(H, T, ReplyTo).
+    process_privmsg(H, T, ReplyTo, Prefix).
+
+admincmp(Prefix, Line) ->
+	{ok, MP} = re:compile(Line),
+	case re:run(Prefix, MP) of
+		{match, _} -> true;
+		nomatch -> false
+	end.
+
+adminchk(Prefix, Dev) ->
+	case io:get_line(Dev, "") of
+		eof ->
+			file:close(Dev), false;
+		Line ->
+			case admincmp(Prefix,
+				lists:filter(fun (X) -> X =/= $\n andalso X =/= $\r end, Line)) of
+				true ->
+					file:close(Dev), true;
+				false ->
+					adminchk(Prefix, Dev)
+			end
+	end.
+
+admin(Prefix) ->
+	{ok, Device} = file:open("admins", [read]),
+	adminchk(Prefix, Device).
 
 %% Handle particular messages
-process_privmsg("quit", _Remainder, _ReplyTo) ->
-    {quit, "QUIT :Goodbye from " ++ ?NICK};
-process_privmsg(_, _, _) ->
+process_privmsg("quit", _Remainder, _ReplyTo, Prefix) ->
+	case admin(Prefix) of
+		true ->
+			{quit, "QUIT :Goodbye from " ++ ?NICK};
+		false ->
+			noreply
+	end;
+process_privmsg(_, _, _, _) ->
     noreply.
 
 quit(Socket, QuitCommand) ->
