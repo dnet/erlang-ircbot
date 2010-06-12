@@ -1,5 +1,6 @@
 -module(ircbot).
 -author("Jim Menard, jimm@io.com").
+-author("András Veres-Szentkirályi, vsza@vsza.hu").
 -export([start/0, start/1, start/2, start/3]).
 % -compile(export_all). % DEBUG
 
