@@ -80,8 +80,6 @@ process_privmsg(Message, ReplyTo) ->
     process_privmsg(H, T, ReplyTo).
 
 %% Handle particular messages
-process_privmsg("hello", _Remainder, ReplyTo) ->
-    {ok, "PRIVMSG " ++ ReplyTo ++ " :Well, hello to you too!"};
 process_privmsg("quit", _Remainder, _ReplyTo) ->
     {quit, "QUIT :Goodbye from " ++ ?NICK};
 process_privmsg(_, _, _) ->
