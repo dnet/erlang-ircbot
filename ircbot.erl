@@ -34,6 +34,9 @@ start(Channel, Host, Port, Modules) ->
 	spawn(fun() -> receive_loop(Socket, Master) end),
 	ModPids = lists:map(
 		fun({M, P}) -> apply(M, ircmain, [Master | P]) end, Modules),
+	master(Channel, ModPids, Socket).
+
+master(Channel, ModPids, Socket) ->
 	receive
 		quit -> lists:foreach(fun(P) -> P ! quit end, ModPids)
 	end.
