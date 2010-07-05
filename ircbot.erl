@@ -41,6 +41,9 @@ master(Channel, ModPids, Socket) ->
 		{announce, Text} ->
 			send(Socket, "PRIVMSG " ++ Channel ++ " :" ++ Text),
 			master(Channel, ModPids, Socket);
+		{topic, Text} ->
+			send(Socket, "TOPIC " ++ Channel ++ " :" ++ Text),
+			master(Channel, ModPids, Socket);
 		quit -> lists:foreach(fun(P) -> P ! quit end, ModPids)
 	end.
 
