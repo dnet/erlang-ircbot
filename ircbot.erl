@@ -38,6 +38,9 @@ start(Channel, Host, Port, Modules) ->
 
 master(Channel, ModPids, Socket) ->
 	receive
+		{announce, Text} ->
+			send(Socket, "PRIVMSG " ++ Channel ++ " :" ++ Text),
+			master(Channel, ModPids, Socket);
 		quit -> lists:foreach(fun(P) -> P ! quit end, ModPids)
 	end.
 
