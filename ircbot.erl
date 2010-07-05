@@ -1,7 +1,7 @@
 -module(ircbot).
 -author("Jim Menard, jimm@io.com").
 -author("András Veres-Szentkirályi, vsza@vsza.hu").
--export([start/0, start/1, start/2, start/3]).
+-export([start/0, start/1, start/2, start/3, start/4]).
 % -compile(export_all). % DEBUG
 
 %% A simple IRC bot. No hot code swapping or anything like that---yet.
@@ -23,11 +23,20 @@ start(Channel, Host) ->
     start(Channel, Host, ?DEFAULT_PORT).
 
 start(Channel, Host, Port) ->
-    % active false means explicit recv needed
-    {ok, Socket} = gen_tcp:connect(Host, Port,
-                                   [binary, {packet, 0}, {active, false}]),
-    send_init(Socket, Channel),
-    spawn(fun() -> receive_loop(Socket) end).
+	start(Channel, Host, Port, []).
+
+start(Channel, Host, Port, Modules) ->
+	% active false means explicit recv needed
+	{ok, Socket} = gen_tcp:connect(Host, Port,
+		[binary, {packet, 0}, {active, false}]),
+	send_init(Socket, Channel),
+	Master = self(),
+	spawn(fun() -> receive_loop(Socket, Master) end),
+	ModPids = lists:map(
+		fun({M, P}) -> apply(M, ircmain, [Master | P]) end, Modules),
+	receive
+		quit -> lists:foreach(fun(P) -> P ! quit end, ModPids)
+	end.
 
 send(Socket, Text) ->
     io:format("~p~n", [Text]),
@@ -38,16 +47,17 @@ send_init(Socket, Channel) ->
     send(Socket, "NICK " ++ ?NICK ++ ""),
     send(Socket, "JOIN " ++ Channel).
 
-receive_loop(Socket) ->
+receive_loop(Socket, Callback) ->
     case gen_tcp:recv(Socket, 0) of
         {ok, Data} ->
             case process(Data) of
                 {ok, Answer} ->
                     send(Socket, Answer),
-                    receive_loop(Socket);
+                    receive_loop(Socket, Callback);
                 noreply ->
-                    receive_loop(Socket);
+                    receive_loop(Socket, Callback);
                 {quit, QuitCommand} ->
+                    Callback ! quit,
                     quit(Socket, QuitCommand),
                     ok
             end;
