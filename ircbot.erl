@@ -34,16 +34,24 @@ start(Channel, Host, Port, Modules) ->
 	spawn(fun() -> receive_loop(Socket, Master) end),
 	ModPids = lists:map(
 		fun({M, P}) -> apply(M, ircmain, [Master | P]) end, Modules),
-	master(Channel, ModPids, Socket).
+	master({Channel, ModPids, Socket, []}).
 
-master(Channel, ModPids, Socket) ->
+master({Channel, ModPids, Socket, RawSubscribers} = State) ->
 	receive
 		{announce, Text} ->
 			send(Socket, "PRIVMSG " ++ Channel ++ " :" ++ Text),
-			master(Channel, ModPids, Socket);
+			master(State);
 		{topic, Text} ->
 			send(Socket, "TOPIC " ++ Channel ++ " :" ++ Text),
-			master(Channel, ModPids, Socket);
+			master(State);
+		{raw, Text} ->
+			send(Socket, Text),
+			master(State);
+		{subscribe, Pid} ->
+			master({Channel, ModPids, Socket, [Pid | RawSubscribers]});
+		{incoming, _} = Data ->
+			lists:foreach(fun(P) -> P ! Data end, ModPids),
+			master(State);
 		quit -> lists:foreach(fun(P) -> P ! quit end, ModPids)
 	end.
 
@@ -59,6 +67,7 @@ send_init(Socket, Channel) ->
 receive_loop(Socket, Callback) ->
     case gen_tcp:recv(Socket, 0) of
         {ok, Data} ->
+            Callback ! {incoming, Data},
             case process(Data) of
                 {ok, Answer} ->
                     send(Socket, Answer),
