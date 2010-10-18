@@ -119,8 +119,7 @@ adminchk(Prefix, Dev) ->
 		eof ->
 			file:close(Dev), false;
 		Line ->
-			case admincmp(Prefix,
-				lists:filter(fun (X) -> X =/= $\n andalso X =/= $\r end, Line)) of
+			case admincmp(Prefix, strip_crlf(Line)) of
 				true ->
 					file:close(Dev), true;
 				false ->
