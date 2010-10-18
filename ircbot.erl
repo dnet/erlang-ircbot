@@ -26,18 +26,21 @@ start(Channel, Host, Port) ->
 	start(Channel, Host, Port, []).
 
 start(Channel, Host, Port, Modules) ->
-	% active false means explicit recv needed
+	% active true means receiving data in messages
 	{ok, Socket} = gen_tcp:connect(Host, Port,
-		[binary, {packet, 0}, {active, false}]),
+		[binary, {active, true}]),
 	send_init(Socket, Channel),
 	Master = self(),
-	spawn(fun() -> receive_loop(Socket, Master) end),
 	ModPids = lists:map(
 		fun({M, P}) -> apply(M, ircmain, [Master | P]) end, Modules),
 	master({Channel, ModPids, Socket, []}).
 
 master({Channel, ModPids, Socket, RawSubscribers} = State) ->
 	receive
+		% Loop cases
+		{tcp_error, Socket, Reason} ->
+			io:format("Socket error [~w]: ~s~n", [Socket, Reason]),
+			master(State);
 		{announce, Text} ->
 			send(Socket, "PRIVMSG " ++ Channel ++ " :" ++ Text),
 			master(State);
@@ -49,10 +52,25 @@ master({Channel, ModPids, Socket, RawSubscribers} = State) ->
 			master(State);
 		{subscribe, Pid} ->
 			master({Channel, ModPids, Socket, [Pid | RawSubscribers]});
-		{incoming, _} = Data ->
+		{tcp, Socket, Data} ->
 			lists:foreach(fun(P) -> P ! Data end, ModPids),
+			case process(Data) of
+				{ok, Answer} ->
+					send(Socket, Answer);
+				noreply ->
+					noreply;
+				{quit, QuitCommand} ->
+					self() ! {quit, QuitCommand}
+			end,
 			master(State);
-		quit -> lists:foreach(fun(P) -> P ! quit end, ModPids)
+		% Quit cases
+		{quit, QuitCommand} ->
+			lists:foreach(fun(P) -> P ! quit end, ModPids),
+            quit(Socket, QuitCommand),
+            ok;
+        {tcp_closed, Socket} ->
+            io:format("Socket ~w closed [~w]~n", [Socket, self()]),
+            ok
 	end.
 
 send(Socket, Text) ->
@@ -63,26 +81,6 @@ send_init(Socket, Channel) ->
     send(Socket, "USER " ++ ?NICK ++ " dummy-host dummy-server :" ++ ?FULL_NAME),
     send(Socket, "NICK " ++ ?NICK ++ ""),
     send(Socket, "JOIN " ++ Channel).
-
-receive_loop(Socket, Callback) ->
-    case gen_tcp:recv(Socket, 0) of
-        {ok, Data} ->
-            Callback ! {incoming, Data},
-            case process(Data) of
-                {ok, Answer} ->
-                    send(Socket, Answer),
-                    receive_loop(Socket, Callback);
-                noreply ->
-                    receive_loop(Socket, Callback);
-                {quit, QuitCommand} ->
-                    Callback ! quit,
-                    quit(Socket, QuitCommand),
-                    ok
-            end;
-        {error, closed} ->
-            io:format("Socket ~w closed [~w]~n", [Socket, self()]),
-            ok
-    end.
 
 %% Incoming message processing
 
