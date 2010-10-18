@@ -84,8 +84,6 @@ send_init(Socket, Channel) ->
 
 %% Incoming message processing
 
-process(<<"PING :", Data/binary>>) ->
-    {ok, "PONG :" ++ strip_crlf(binary_to_list(Data))};
 process(Data) ->
     Str = strip_crlf(binary_to_list(Data)),
     io:format("~p~n", [Str]),
