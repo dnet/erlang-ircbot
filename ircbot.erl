@@ -10,7 +10,7 @@
 
 -define(DEFAULT_SERVER, "irc.freenode.net").
 -define(DEFAULT_PORT, 6667).
--define(NICK, "jimm-erlang-bot").
+-include("nick.hrl").
 -define(FULL_NAME, "Jim's Erlang Bot").
 
 start() ->
@@ -53,15 +53,7 @@ master({Channel, ModPids, Socket, RawSubscribers} = State) ->
 		{subscribe, Pid} ->
 			master({Channel, ModPids, Socket, [Pid | RawSubscribers]});
 		{tcp, Socket, Data} ->
-			lists:foreach(fun(P) -> P ! Data end, ModPids),
-			case process(Data) of
-				{ok, Answer} ->
-					send(Socket, Answer);
-				noreply ->
-					noreply;
-				{quit, QuitCommand} ->
-					self() ! {quit, QuitCommand}
-			end,
+			lists:foreach(fun(P) -> P ! {incoming, Data} end, RawSubscribers),
 			master(State);
 		% Quit cases
 		{quit, QuitCommand} ->
@@ -82,102 +74,7 @@ send_init(Socket, Channel) ->
     send(Socket, "NICK " ++ ?NICK ++ ""),
     send(Socket, "JOIN " ++ Channel).
 
-%% Incoming message processing
-
-process(Data) ->
-    Str = strip_crlf(binary_to_list(Data)),
-    io:format("~p~n", [Str]),
-    {Prefix, Command, Params} = parse_message(Str),
-    process(Prefix, Command, Params).
-
-process(Prefix, "PRIVMSG", Params) ->
-    [To, Message] = Params,
-    ReplyTo = privmsg_reply_to(Prefix, To),
-    process_privmsg(Message, ReplyTo, Prefix);
-process(_, _, _) ->
-    noreply.
-
-process_privmsg(_, noreply, _) ->
-    noreply;
-process_privmsg(Message, ReplyTo, Prefix) ->
-    [H|T] = string:tokens(Message, " "),
-    process_privmsg(H, T, ReplyTo, Prefix).
-
-admincmp(Prefix, Line) ->
-	{ok, MP} = re:compile(Line),
-	case re:run(Prefix, MP) of
-		{match, _} -> true;
-		nomatch -> false
-	end.
-
-adminchk(Prefix, Dev) ->
-	case io:get_line(Dev, "") of
-		eof ->
-			file:close(Dev), false;
-		Line ->
-			case admincmp(Prefix, strip_crlf(Line)) of
-				true ->
-					file:close(Dev), true;
-				false ->
-					adminchk(Prefix, Dev)
-			end
-	end.
-
-admin(Prefix) ->
-	{ok, Device} = file:open("admins", [read]),
-	adminchk(Prefix, Device).
-
-%% Handle particular messages
-process_privmsg("quit", _Remainder, _ReplyTo, Prefix) ->
-	case admin(Prefix) of
-		true ->
-			{quit, "QUIT :Goodbye from " ++ ?NICK};
-		false ->
-			noreply
-	end;
-process_privmsg(_, _, _, _) ->
-    noreply.
-
 quit(Socket, QuitCommand) ->
     send(Socket, QuitCommand),
     gen_tcp:close(Socket),
     io:format("Socket ~w closed [~w]~n", [Socket, self()]).
-
-strip_crlf(Str) ->
-    string:strip(string:strip(Str, right, $\n), right, $\r).
-
-% Return {Prefix, Command, Params} or {undefined, Command, Params}.
-parse_message([$:|Msg]) ->
-    Tokens = string:tokens(Msg, " "),
-    [Prefix|T] = Tokens,
-    [Command|T2] = T,
-    {Prefix, Command, params(T2)};
-parse_message(Msg) ->
-    Tokens = string:tokens(Msg, " "),
-    [Command|T] = Tokens,
-    {undefined, Command, params(T)}.
-
-% Turn list of params into new list where ["foo" ":rest" "of" "line"] becomes
-% ["foo" "rest of line"].
-params(L) ->
-    params(L, []).
-
-params([], P) ->
-    lists:reverse(P);
-params([[$:|HT]|T], P) ->
-    params([], [string:join([HT|T], " ")|P]);
-params([H|T], P) ->
-    params(T, [H|P]).
-
-% Return the nick or channel to which a reply should be sent.
-privmsg_reply_to(Prefix, ?NICK) ->
-    sender_of(Prefix);
-privmsg_reply_to(_Prefix, [$#|_]=OrigTo) ->
-    OrigTo;
-privmsg_reply_to(_, _) ->
-    noreply.
-
-% Extract and return sender from a message prefix.
-sender_of(Prefix) ->
-    [Nick|_] = string:tokens(Prefix, "!"),
-    Nick.
