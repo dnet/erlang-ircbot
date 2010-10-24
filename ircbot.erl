@@ -41,6 +41,10 @@ connect(Channel, Host, Port) ->
 	send_init(Socket, Channel),
 	Socket.
 
+reconnect_master(S) ->
+	Socket = connect(S#ms.channel, S#ms.host, S#ms.port),
+	master(S#ms{socket = Socket}).
+
 master(State = #ms{socket = Socket}) ->
 	receive
 		% Loop cases
@@ -61,13 +65,13 @@ master(State = #ms{socket = Socket}) ->
 		{tcp, Socket, Data} ->
 			lists:foreach(fun(P) -> P ! {incoming, Data} end, State#ms.rawsubscribers),
 			master(State);
+		{tcp_closed, Socket} ->
+			io:format("Socket ~w closed [~w]~n", [Socket, self()]),
+			reconnect_master(State);
 		% Quit cases
 		{quit, QuitCommand} ->
 			lists:foreach(fun(P) -> P ! quit end, State#ms.modpids),
             quit(Socket, QuitCommand),
-            ok;
-        {tcp_closed, Socket} ->
-            io:format("Socket ~w closed [~w]~n", [Socket, self()]),
             ok
 	end.
 
