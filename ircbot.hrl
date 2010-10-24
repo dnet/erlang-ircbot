@@ -1,1 +1,1 @@
--record(ms, {channel, modpids, socket, rawsubscribers = []}).
+-record(ms, {channel, modpids, socket, rawsubscribers = [], host, port}).

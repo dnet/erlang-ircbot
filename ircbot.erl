@@ -27,14 +27,19 @@ start(Channel, Host, Port) ->
 	start(Channel, Host, Port, []).
 
 start(Channel, Host, Port, Modules) ->
+	Socket = connect(Channel, Host, Port),
+	Master = self(),
+	ModPids = lists:map(
+		fun({M, P}) -> apply(M, ircmain, [Master | P]) end, Modules),
+	master(#ms{channel = Channel, modpids = ModPids,
+		socket = Socket, host = Host, port = Port}).
+
+connect(Channel, Host, Port) ->
 	% active true means receiving data in messages
 	{ok, Socket} = gen_tcp:connect(Host, Port,
 		[binary, {active, true}]),
 	send_init(Socket, Channel),
-	Master = self(),
-	ModPids = lists:map(
-		fun({M, P}) -> apply(M, ircmain, [Master | P]) end, Modules),
-	master(#ms{channel = Channel, modpids = ModPids, socket = Socket}).
+	Socket.
 
 master(State = #ms{socket = Socket}) ->
 	receive
