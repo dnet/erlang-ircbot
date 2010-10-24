@@ -1,0 +1,1 @@
+-record(ms, {channel, modpids, socket, rawsubscribers = []}).

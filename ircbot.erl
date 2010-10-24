@@ -1,6 +1,7 @@
 -module(ircbot).
 -author("Jim Menard, jimm@io.com").
 -author("András Veres-Szentkirályi, vsza@vsza.hu").
+-include("ircbot.hrl").
 -export([start/0, start/1, start/2, start/3, start/4]).
 % -compile(export_all). % DEBUG
 
@@ -33,31 +34,31 @@ start(Channel, Host, Port, Modules) ->
 	Master = self(),
 	ModPids = lists:map(
 		fun({M, P}) -> apply(M, ircmain, [Master | P]) end, Modules),
-	master({Channel, ModPids, Socket, []}).
+	master(#ms{channel = Channel, modpids = ModPids, socket = Socket}).
 
-master({Channel, ModPids, Socket, RawSubscribers} = State) ->
+master(State = #ms{socket = Socket}) ->
 	receive
 		% Loop cases
 		{tcp_error, Socket, Reason} ->
 			io:format("Socket error [~w]: ~s~n", [Socket, Reason]),
 			master(State);
 		{announce, Text} ->
-			send(Socket, "PRIVMSG " ++ Channel ++ " :" ++ Text),
+			send(Socket, "PRIVMSG " ++ State#ms.channel ++ " :" ++ Text),
 			master(State);
 		{topic, Text} ->
-			send(Socket, "TOPIC " ++ Channel ++ " :" ++ Text),
+			send(Socket, "TOPIC " ++ State#ms.channel ++ " :" ++ Text),
 			master(State);
 		{raw, Text} ->
 			send(Socket, Text),
 			master(State);
 		{subscribe, Pid} ->
-			master({Channel, ModPids, Socket, [Pid | RawSubscribers]});
+			master(State#ms{rawsubscribers = [Pid | State#ms.rawsubscribers]});
 		{tcp, Socket, Data} ->
-			lists:foreach(fun(P) -> P ! {incoming, Data} end, RawSubscribers),
+			lists:foreach(fun(P) -> P ! {incoming, Data} end, State#ms.rawsubscribers),
 			master(State);
 		% Quit cases
 		{quit, QuitCommand} ->
-			lists:foreach(fun(P) -> P ! quit end, ModPids),
+			lists:foreach(fun(P) -> P ! quit end, State#ms.modpids),
             quit(Socket, QuitCommand),
             ok;
         {tcp_closed, Socket} ->
