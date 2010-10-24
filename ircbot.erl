@@ -68,6 +68,9 @@ master(State = #ms{socket = Socket}) ->
 		{tcp_closed, Socket} ->
 			io:format("Socket ~w closed [~w]~n", [Socket, self()]),
 			reconnect_master(State);
+		{reconnect, QuitCommand} ->
+			quit(Socket, QuitCommand),
+			reconnect_master(State);
 		% Quit cases
 		{quit, QuitCommand} ->
 			lists:foreach(fun(P) -> P ! quit end, State#ms.modpids),
