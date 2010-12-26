@@ -62,6 +62,9 @@ master(State = #ms{socket = Socket}) ->
 			master(State);
 		{subscribe, Pid} ->
 			master(State#ms{rawsubscribers = [Pid | State#ms.rawsubscribers]});
+		{getmods, Pid} ->
+			Pid ! {mods, State#ms.modpids},
+			master(State);
 		{tcp, Socket, Data} ->
 			lists:foreach(fun(P) -> P ! {incoming, Data} end, State#ms.rawsubscribers),
 			master(State);

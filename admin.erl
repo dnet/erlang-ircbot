@@ -1,5 +1,5 @@
 -module(admin).
--export([ircmain/1, ircproc/1]).
+-export([ircmain/1, ircproc/1, lsmod/2]).
 -include("nick.hrl").
 
 ircmain(Contact) ->
@@ -11,7 +11,7 @@ ircproc(Contact) ->
 	receive
 		quit -> quit;
 		{incoming, Data} ->
-			case process(Data) of
+			case process(Data, Contact) of
 				{ok, Answer} ->
 					Contact ! {raw, Answer},
 					ircproc(Contact);
@@ -25,24 +25,24 @@ ircproc(Contact) ->
 
 %% Incoming message processing
 
-process(Data) ->
+process(Data, Contact) ->
     Str = strip_crlf(binary_to_list(Data)),
     io:format("~p~n", [Str]),
     {Prefix, Command, Params} = parse_message(Str),
-    process(Prefix, Command, Params).
+    process(Prefix, Command, Params, Contact).
 
-process(Prefix, "PRIVMSG", Params) ->
+process(Prefix, "PRIVMSG", Params, Contact) ->
     [To, Message] = Params,
     ReplyTo = privmsg_reply_to(Prefix, To),
-    process_privmsg(Message, ReplyTo, Prefix);
-process(_, _, _) ->
+    process_privmsg(Message, ReplyTo, Prefix, Contact);
+process(_, _, _, _) ->
     noreply.
 
-process_privmsg(_, noreply, _) ->
+process_privmsg(_, noreply, _, _) ->
     noreply;
-process_privmsg(Message, ReplyTo, Prefix) ->
+process_privmsg(Message, ReplyTo, Prefix, Contact) ->
     [H|T] = string:tokens(Message, " "),
-    process_privmsg(H, T, ReplyTo, Prefix).
+    process_privmsg(H, T, ReplyTo, Prefix, Contact).
 
 admincmp(Prefix, Line) ->
 	{ok, MP} = re:compile(Line),
@@ -69,15 +69,33 @@ admin(Prefix) ->
 	adminchk(Prefix, Device).
 
 %% Handle particular messages
-process_privmsg("quit", _Remainder, _ReplyTo, Prefix) ->
+process_privmsg("quit", _Remainder, _ReplyTo, Prefix, _Contact) ->
 	case admin(Prefix) of
 		true ->
 			{quit, "QUIT :Goodbye from " ++ ?NICK};
 		false ->
 			noreply
 	end;
-process_privmsg(_, _, _, _) ->
+process_privmsg("lsmod", _Remainder, ReplyTo, Prefix, Contact) ->
+	case admin(Prefix) of
+		true ->
+			spawn(?MODULE, lsmod, [ReplyTo, Contact]), noreply;
+		false ->
+			noreply
+	end;
+process_privmsg(_, _, _, _, _) ->
     noreply.
+
+lsmod(To, Contact) ->
+	Contact ! {getmods, self()},
+	receive
+		{mods, L} -> Contact ! {raw, lists:foldl(
+			fun(Pid, Msg) ->
+				Msg ++ "\r\nPRIVMSG " ++ To ++ " :" ++ pid_to_list(Pid)
+			end, "PRIVMSG " ++ To ++ " :Loaded modules:", L)}
+	after 1500 ->
+		Contact ! {raw, "PRIVMSG " ++ To ++ " :(timeout)"}
+	end.
 
 strip_crlf(Str) ->
     string:strip(string:strip(Str, right, $\n), right, $\r).
