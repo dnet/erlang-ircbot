@@ -100,6 +100,24 @@ process_privmsg("insmod", Remainder, ReplyTo, Prefix, Contact) ->
 		false ->
 			noreply
 	end;
+process_privmsg("load", [Module | _], ReplyTo, Prefix, _Contact) ->
+	case admin(Prefix) of
+		true ->
+			Atom = list_to_atom(Module),
+			{ok, "PRIVMSG " ++ ReplyTo ++ " :" ++
+				case code:load_file(Atom) of
+					{module, Atom} -> "module loaded ok";
+					{error, not_purged} ->
+						case code:soft_purge(Atom) of
+							true -> "module loaded ok (old version got purged)";
+							false -> "old version is still in use, use rmmod"
+						end;
+					{error, What} -> "could not load module: " ++ atom_to_list(What)
+				end
+			};
+		false ->
+			noreply
+	end;
 process_privmsg(_, _, _, _, _) ->
     noreply.
 
