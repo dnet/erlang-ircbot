@@ -78,6 +78,17 @@ master(State = #ms{socket = Socket}) ->
 					RespPid ! {killmod, "invalid module"},
 					State
 			end);
+		{insmod, ModName, Params, Pid} ->
+			ModAtom = list_to_atom(ModName),
+			case erlang:function_exported(ModAtom, ircmain, length(Params) + 1) of
+				true ->
+					ModPid = apply(ModAtom, ircmain, [self() | Params]),
+					Pid ! {insmod, "inserted module " ++ ModName ++ " as PID " ++ pid_to_list(ModPid)},
+					master(State#ms{modpids = [ModPid | State#ms.modpids]});
+				false ->
+					Pid ! {insmod, "invalid module or parameter count"},
+					master(State)
+			end;
 		{tcp, Socket, Data} ->
 			lists:foreach(fun(P) -> P ! {incoming, Data} end, State#ms.rawsubscribers),
 			master(State);
