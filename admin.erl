@@ -72,35 +72,35 @@ admin(Prefix) ->
 	adminchk(Prefix, Device).
 
 %% Handle particular messages
-process_privmsg("quit", _Remainder, _ReplyTo, Prefix, _Contact) ->
+process_privmsg("-quit", _Remainder, _ReplyTo, Prefix, _Contact) ->
 	case admin(Prefix) of
 		true ->
 			{quit, "QUIT :Goodbye from " ++ ?NICK};
 		false ->
 			noreply
 	end;
-process_privmsg("lsmod", _Remainder, ReplyTo, Prefix, Contact) ->
+process_privmsg("-lsmod", _Remainder, ReplyTo, Prefix, Contact) ->
 	case admin(Prefix) of
 		true ->
 			spawn(?MODULE, lsmod, [ReplyTo, Contact]), noreply;
 		false ->
 			noreply
 	end;
-process_privmsg("rmmod", Remainder, ReplyTo, Prefix, Contact) ->
+process_privmsg("-rmmod", Remainder, ReplyTo, Prefix, Contact) ->
 	case admin(Prefix) of
 		true ->
 			spawn(?MODULE, rmmod, [ReplyTo, Remainder, Contact]), noreply;
 		false ->
 			noreply
 	end;
-process_privmsg("insmod", Remainder, ReplyTo, Prefix, Contact) ->
+process_privmsg("-insmod", Remainder, ReplyTo, Prefix, Contact) ->
 	case admin(Prefix) of
 		true ->
 			spawn(?MODULE, insmod, [ReplyTo, Remainder, Contact]), noreply;
 		false ->
 			noreply
 	end;
-process_privmsg("load", [Module | _], ReplyTo, Prefix, _Contact) ->
+process_privmsg("-load", [Module | _], ReplyTo, Prefix, _Contact) ->
 	case admin(Prefix) of
 		true ->
 			Atom = list_to_atom(Module),
@@ -118,7 +118,7 @@ process_privmsg("load", [Module | _], ReplyTo, Prefix, _Contact) ->
 		false ->
 			noreply
 	end;
-process_privmsg("help", _Remainder, ReplyTo, Prefix, _Contact) ->
+process_privmsg("-help", _Remainder, ReplyTo, Prefix, _Contact) ->
 	case admin(Prefix) of
 		true ->
 			{ok, "PRIVMSG " ++ ReplyTo ++
