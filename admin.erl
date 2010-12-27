@@ -1,5 +1,5 @@
 -module(admin).
--export([ircmain/1, ircproc/1, lsmod/2]).
+-export([ircmain/1, ircproc/1, lsmod/2, rmmod/3]).
 -include("nick.hrl").
 
 ircmain(Contact) ->
@@ -86,6 +86,13 @@ process_privmsg("lsmod", _Remainder, ReplyTo, Prefix, Contact) ->
 		false ->
 			noreply
 	end;
+process_privmsg("rmmod", Remainder, ReplyTo, Prefix, Contact) ->
+	case admin(Prefix) of
+		true ->
+			spawn(?MODULE, rmmod, [ReplyTo, Remainder, Contact]), noreply;
+		false ->
+			noreply
+	end;
 process_privmsg(_, _, _, _, _) ->
     noreply.
 
@@ -100,6 +107,19 @@ lsmod(To, Contact) ->
 					integer_to_list(N) ++ ". " ++ pid_to_list(Pid) ++ " " ++ Ident}
 			end, {1, "PRIVMSG " ++ To ++ " :Loaded modules:"}, L),
 			Contact ! {raw, T}
+	after 1500 ->
+		Contact ! {raw, "PRIVMSG " ++ To ++ " :(timeout)"}
+	end.
+
+rmmod(To, [FirstParam | _], Contact) ->
+	N = list_to_integer(FirstParam),
+	Contact ! {getmods, self()},
+	receive
+		{mods, L} ->
+			ModPid = lists:nth(N, L),
+			Contact ! {killmod, ModPid, self()},
+			Resp = receive {killmod, Msg} -> Msg after 500 -> "(timeout)" end,
+			Contact ! {raw, "PRIVMSG " ++ To ++ " :" ++ Resp}
 	after 1500 ->
 		Contact ! {raw, "PRIVMSG " ++ To ++ " :(timeout)"}
 	end.

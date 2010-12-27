@@ -65,6 +65,19 @@ master(State = #ms{socket = Socket}) ->
 		{getmods, Pid} ->
 			Pid ! {mods, State#ms.modpids},
 			master(State);
+		{killmod, ModPid, RespPid} ->
+			master(case lists:member(ModPid, State#ms.modpids) of
+				true ->
+					ModPid ! quit,
+					RespPid ! {killmod, "removed module " ++ pid_to_list(ModPid)},
+					State#ms{
+						rawsubscribers = lists:delete(ModPid, State#ms.rawsubscribers),
+						modpids = lists:delete(ModPid, State#ms.modpids)
+					};
+				false ->
+					RespPid ! {killmod, "invalid module"},
+					State
+			end);
 		{tcp, Socket, Data} ->
 			lists:foreach(fun(P) -> P ! {incoming, Data} end, State#ms.rawsubscribers),
 			master(State);
