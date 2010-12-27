@@ -13,6 +13,9 @@ ircproc(Contact) ->
 			S = binary_to_list(Data),
 			[ServerName | _] = string:tokens(S, " "),
 			inner_ircproc(Contact, ServerName);
+		{ident, Pid} ->
+			Pid ! {ident, "ping"},
+			ircproc(Contact);
 		_ -> ircproc(Contact)
 	end.
 
@@ -22,6 +25,9 @@ inner_ircproc(Contact, ServerName) ->
 inner_ircproc(Contact, ServerName, Reconnect) ->
 	receive
 		quit -> quit;
+		{ident, Pid} ->
+			Pid ! {ident, "ping"},
+			inner_ircproc(Contact, ServerName, Reconnect);
 		_ -> inner_ircproc(Contact, ServerName)
 		after 120000 ->
 			case Reconnect of

@@ -20,6 +20,9 @@ ircproc(Contact) ->
 				{quit, _QuitCommand} = Q ->
 					Contact ! Q
 			end;
+		{ident, Pid} ->
+			Pid ! {ident, "admin"},
+			ircproc(Contact);
 		_ -> ircproc(Contact)
 	end.
 
@@ -89,10 +92,14 @@ process_privmsg(_, _, _, _, _) ->
 lsmod(To, Contact) ->
 	Contact ! {getmods, self()},
 	receive
-		{mods, L} -> Contact ! {raw, lists:foldl(
-			fun(Pid, Msg) ->
-				Msg ++ "\r\nPRIVMSG " ++ To ++ " :" ++ pid_to_list(Pid)
-			end, "PRIVMSG " ++ To ++ " :Loaded modules:", L)}
+		{mods, L} -> {_, T} = lists:foldl(
+			fun(Pid, {N, Msg}) ->
+				Pid ! {ident, self()},
+				Ident = receive {ident, I} -> I after 200 -> "(timeout)" end,
+				{N + 1, Msg ++ "\r\nPRIVMSG " ++ To ++ " :" ++
+					integer_to_list(N) ++ ". " ++ pid_to_list(Pid) ++ " " ++ Ident}
+			end, {1, "PRIVMSG " ++ To ++ " :Loaded modules:"}, L),
+			Contact ! {raw, T}
 	after 1500 ->
 		Contact ! {raw, "PRIVMSG " ++ To ++ " :(timeout)"}
 	end.

@@ -12,5 +12,8 @@ ircproc(Contact) ->
 		{incoming, <<"PING :", Data/binary>>} ->
 			Contact ! {raw, "PONG :" ++ binary_to_list(Data)},
 			ircproc(Contact);
+		{ident, Pid} ->
+			Pid ! {ident, "pong"},
+			ircproc(Contact);
 		_ -> ircproc(Contact)
 	end.
