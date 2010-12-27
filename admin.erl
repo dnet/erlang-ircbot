@@ -118,6 +118,14 @@ process_privmsg("load", [Module | _], ReplyTo, Prefix, _Contact) ->
 		false ->
 			noreply
 	end;
+process_privmsg("help", _Remainder, ReplyTo, Prefix, _Contact) ->
+	case admin(Prefix) of
+		true ->
+			{ok, "PRIVMSG " ++ ReplyTo ++
+				" :Available commands are: quit, lsmod, rmmod, insmod, load, help"};
+		false ->
+			noreply
+	end;
 process_privmsg(_, _, _, _, _) ->
     noreply.
 
