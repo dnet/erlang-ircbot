@@ -1,10 +1,18 @@
 -module(ping).
--export([ircmain/1, ircproc/1]).
+-export([ircmain/1, ircproc/1, reload/2, reload_inner/4]).
 
 ircmain(Contact) ->
 	Pid = spawn(?MODULE, ircproc, [Contact]),
 	Contact ! {subscribe, Pid},
 	Pid.
+
+reload_inner(Contact, ServerName, Reconnect, Pid) ->
+	Pid ! reloaded,
+	inner_ircproc(Contact, ServerName, Reconnect).
+
+reload(Contact, Pid) ->
+	Pid ! reloaded,
+	ircproc(Contact).
 
 ircproc(Contact) ->
 	receive
@@ -16,6 +24,8 @@ ircproc(Contact) ->
 		{ident, Pid} ->
 			Pid ! {ident, "ping"},
 			ircproc(Contact);
+		{reload, Pid} ->
+			?MODULE:reload(Contact, Pid);
 		_ -> ircproc(Contact)
 	end.
 
@@ -28,6 +38,8 @@ inner_ircproc(Contact, ServerName, Reconnect) ->
 		{ident, Pid} ->
 			Pid ! {ident, "ping"},
 			inner_ircproc(Contact, ServerName, Reconnect);
+		{reload, Pid} ->
+			?MODULE:reload_inner(Contact, ServerName, Reconnect, Pid);
 		_ -> inner_ircproc(Contact, ServerName)
 		after 120000 ->
 			case Reconnect of

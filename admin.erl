@@ -1,11 +1,15 @@
 -module(admin).
--export([ircmain/1, ircproc/1, lsmod/2, rmmod/3, insmod/3]).
+-export([ircmain/1, ircproc/1, lsmod/2, rmmod/3, insmod/3, reload/3, reload/2]).
 -include("nick.hrl").
 
 ircmain(Contact) ->
 	Pid = spawn(?MODULE, ircproc, [Contact]),
 	Contact ! {subscribe, Pid},
 	Pid.
+
+reload(Contact, Pid) ->
+	Pid ! reloaded,
+	ircproc(Contact).
 
 ircproc(Contact) ->
 	receive
@@ -23,6 +27,8 @@ ircproc(Contact) ->
 		{ident, Pid} ->
 			Pid ! {ident, "admin"},
 			ircproc(Contact);
+		{reload, Pid} ->
+			?MODULE:reload(Contact, Pid);
 		_ -> ircproc(Contact)
 	end.
 
@@ -100,6 +106,13 @@ process_privmsg("-insmod", Remainder, ReplyTo, Prefix, Contact) ->
 		false ->
 			noreply
 	end;
+process_privmsg("-reload", Remainder, ReplyTo, Prefix, Contact) ->
+	case admin(Prefix) of
+		true ->
+			spawn(?MODULE, reload, [ReplyTo, Remainder, Contact]), noreply;
+		false ->
+			noreply
+	end;
 process_privmsg("-load", [Module | _], ReplyTo, Prefix, _Contact) ->
 	case admin(Prefix) of
 		true ->
@@ -161,6 +174,18 @@ insmod(To, [ModName | Params], Contact) ->
 	Contact ! {insmod, ModName, Params, self()},
 	receive
 		{insmod, Resp} ->
+			Contact ! {raw, "PRIVMSG " ++ To ++ " :" ++ Resp}
+	after 1500 ->
+		Contact ! {raw, "PRIVMSG " ++ To ++ " :(timeout)"}
+	end.
+
+reload(To, [FirstParam | _], Contact) ->
+	N = list_to_integer(FirstParam),
+	Contact ! {getmods, self()},
+	receive
+		{mods, L} ->
+			lists:nth(N, L) ! {reload, self()},
+			Resp = receive reloaded -> "module reloaded successfully" after 2500 -> "(timeout)" end,
 			Contact ! {raw, "PRIVMSG " ++ To ++ " :" ++ Resp}
 	after 1500 ->
 		Contact ! {raw, "PRIVMSG " ++ To ++ " :(timeout)"}
