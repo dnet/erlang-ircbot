@@ -50,8 +50,11 @@ process(_, _, _, _) ->
 process_privmsg(_, noreply, _, _) ->
     noreply;
 process_privmsg(Message, ReplyTo, Prefix, Contact) ->
-    [H|T] = string:tokens(Message, " "),
-    process_privmsg(H, T, ReplyTo, Prefix, Contact).
+	case string:tokens(Message, " ") of
+		[] -> noreply;
+		[H|T] ->
+			process_privmsg(H, T, ReplyTo, Prefix, Contact)
+	end.
 
 admincmp(Prefix, Line) ->
 	{ok, MP} = re:compile(Line),
