@@ -138,7 +138,7 @@ process_privmsg("-help", _Remainder, ReplyTo, Prefix, _Contact) ->
 	case admin(Prefix) of
 		true ->
 			{ok, "PRIVMSG " ++ ReplyTo ++
-				" :Available commands are: quit, lsmod, rmmod, insmod, load, help"};
+				" :Available commands are: quit, lsmod, rmmod, insmod, load, reload, help"};
 		false ->
 			noreply
 	end;
