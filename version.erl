@@ -14,9 +14,9 @@ ircproc(Contact) ->
 	receive
 		quit -> quit;
 		{incoming, <<":", Data/binary>>} ->
-			case string:tokens(binary_to_list(Data), " ") of
-				[From, "PRIVMSG", _, [58, 1, $V, $E, $R, $S, $I, $O, $N, 1 | _]] ->
-					[Nick | _] = string:tokens(From, "!"),
+			case binary:split(Data, <<" ">>, [global]) of
+				[From, <<"PRIVMSG">>, _Me, <<":\x01VERSION\x01", _/binary>> | _] ->
+					[Nick | _] = binary:split(From, <<$!>>),
 					Contact ! {raw, io_lib:format(
 						"NOTICE ~s :\x01VERSION jimm-erlang-bot running "
 						"on Erlang emulator ~s OTP release ~s\x01",

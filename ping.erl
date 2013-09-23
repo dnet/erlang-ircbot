@@ -18,8 +18,7 @@ ircproc(Contact) ->
 	receive
 		quit -> quit;
 		{incoming, Data} ->
-			S = binary_to_list(Data),
-			[ServerName | _] = string:tokens(S, " "),
+			[ServerName | _] = binary:split(Data, <<" ">>),
 			inner_ircproc(Contact, ServerName);
 		{ident, Pid} ->
 			Pid ! {ident, "ping"},
