@@ -56,28 +56,21 @@ process_privmsg(Message, ReplyTo, Prefix, Contact) ->
 			process_privmsg(H, T, ReplyTo, Prefix, Contact)
 	end.
 
-admincmp(Prefix, Line) ->
-	{ok, MP} = re:compile(Line),
-	case re:run(Prefix, MP) of
-		{match, _} -> true;
-		nomatch -> false
-	end.
-
 adminchk(Prefix, Dev) ->
-	case io:get_line(Dev, "") of
+	case file:read_line(Dev) of
 		eof ->
 			file:close(Dev), false;
-		Line ->
-			case admincmp(Prefix, strip_crlf(Line)) of
-				true ->
+		{ok, Line} ->
+			case re:run(Prefix, strip_crlf(Line)) of
+				{match, _} ->
 					file:close(Dev), true;
-				false ->
+				nomatch ->
 					adminchk(Prefix, Dev)
 			end
 	end.
 
 admin(Prefix) ->
-	{ok, Device} = file:open("admins", [read]),
+	{ok, Device} = file:open("admins", [read, raw, read_ahead]),
 	adminchk(Prefix, Device).
 
 %% Handle particular messages
