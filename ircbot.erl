@@ -52,10 +52,10 @@ master(State = #ms{socket = Socket}) ->
 			io:format("Socket error [~w]: ~s~n", [Socket, Reason]),
 			master(State);
 		{announce, Text} ->
-			send(Socket, "PRIVMSG " ++ State#ms.channel ++ " :" ++ Text),
+			send(Socket, ["PRIVMSG ", State#ms.channel, " :", Text]),
 			master(State);
 		{topic, Text} ->
-			send(Socket, "TOPIC " ++ State#ms.channel ++ " :" ++ Text),
+			send(Socket, ["TOPIC ", State#ms.channel, " :", Text]),
 			master(State);
 		{raw, Text} ->
 			send(Socket, Text),
@@ -69,7 +69,7 @@ master(State = #ms{socket = Socket}) ->
 			master(case lists:member(ModPid, State#ms.modpids) of
 				true ->
 					ModPid ! quit,
-					RespPid ! {killmod, "removed module " ++ pid_to_list(ModPid)},
+					RespPid ! {killmod, ["removed module ", pid_to_list(ModPid)]},
 					State#ms{
 						rawsubscribers = lists:delete(ModPid, State#ms.rawsubscribers),
 						modpids = lists:delete(ModPid, State#ms.modpids)
@@ -83,7 +83,8 @@ master(State = #ms{socket = Socket}) ->
 			case erlang:function_exported(ModAtom, ircmain, length(Params) + 1) of
 				true ->
 					ModPid = apply(ModAtom, ircmain, [self() | Params]),
-					Pid ! {insmod, "inserted module " ++ ModName ++ " as PID " ++ pid_to_list(ModPid)},
+					Pid ! {insmod, io_lib:format(
+									 "inserted module ~s as PID ~w", [ModName, ModPid])},
 					master(State#ms{modpids = [ModPid | State#ms.modpids]});
 				false ->
 					Pid ! {insmod, "invalid module or parameter count"},
@@ -107,12 +108,12 @@ master(State = #ms{socket = Socket}) ->
 
 send(Socket, Text) ->
     io:format("~p~n", [Text]),
-    gen_tcp:send(Socket, list_to_binary(Text ++ "\r\n")).
+    gen_tcp:send(Socket, [Text, "\r\n"]).
 
 send_init(Socket, Channel) ->
-    send(Socket, "USER " ++ ?NICK ++ " dummy-host dummy-server :" ++ ?FULL_NAME),
-    send(Socket, "NICK " ++ ?NICK ++ ""),
-    send(Socket, "JOIN " ++ Channel).
+    send(Socket, ["USER ", ?NICK, " dummy-host dummy-server :", ?FULL_NAME]),
+    send(Socket, ["NICK ", ?NICK]),
+    send(Socket, ["JOIN ", Channel]).
 
 quit(Socket, QuitCommand) ->
     send(Socket, QuitCommand),

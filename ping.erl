@@ -47,7 +47,7 @@ inner_ircproc(Contact, ServerName, Reconnect) ->
 					Contact ! {reconnect, "QUIT :Reconnecting"},
 					inner_ircproc(Contact, ServerName);
 				_ ->
-					Contact ! {raw, "PING " ++ ServerName},
+					Contact ! {raw, ["PING ", ServerName]},
 					inner_ircproc(Contact, ServerName, true)
 			end
 	end.

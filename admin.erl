@@ -84,7 +84,7 @@ admin(Prefix) ->
 process_privmsg("-quit", _Remainder, _ReplyTo, Prefix, _Contact) ->
 	case admin(Prefix) of
 		true ->
-			{quit, "QUIT :Goodbye from " ++ ?NICK};
+			{quit, ["QUIT :Goodbye from ", ?NICK]};
 		false ->
 			noreply
 	end;
@@ -120,7 +120,7 @@ process_privmsg("-load", [Module | _], ReplyTo, Prefix, _Contact) ->
 	case admin(Prefix) of
 		true ->
 			Atom = list_to_atom(Module),
-			{ok, "PRIVMSG " ++ ReplyTo ++ " :" ++
+			{ok, ["PRIVMSG ", ReplyTo, " :",
 				case code:load_file(Atom) of
 					{module, Atom} -> "module loaded ok";
 					{error, not_purged} ->
@@ -128,8 +128,8 @@ process_privmsg("-load", [Module | _], ReplyTo, Prefix, _Contact) ->
 							true -> "module loaded ok (old version got purged)";
 							false -> "old version is still in use, use rmmod"
 						end;
-					{error, What} -> "could not load module: " ++ atom_to_list(What)
-				end
+					{error, What} -> ["could not load module: ", atom_to_list(What)]
+				end]
 			};
 		false ->
 			noreply
@@ -137,8 +137,8 @@ process_privmsg("-load", [Module | _], ReplyTo, Prefix, _Contact) ->
 process_privmsg("-help", _Remainder, ReplyTo, Prefix, _Contact) ->
 	case admin(Prefix) of
 		true ->
-			{ok, "PRIVMSG " ++ ReplyTo ++
-				" :Available commands are: quit, lsmod, rmmod, insmod, load, reload, help"};
+			{ok, ["PRIVMSG ", ReplyTo,
+				" :Available commands are: quit, lsmod, rmmod, insmod, load, reload, help"]};
 		false ->
 			noreply
 	end;
@@ -152,12 +152,13 @@ lsmod(To, Contact) ->
 			fun(Pid, {N, Msg}) ->
 				Pid ! {ident, self()},
 				Ident = receive {ident, I} -> I after 200 -> "(timeout)" end,
-				{N + 1, Msg ++ "\r\nPRIVMSG " ++ To ++ " :" ++
-					integer_to_list(N) ++ ". " ++ pid_to_list(Pid) ++ " " ++ Ident}
-			end, {1, "PRIVMSG " ++ To ++ " :Loaded modules:"}, L),
+				{N + 1, io_lib:format(
+						  "~s\r\nPRIVMSG ~s :~w. ~w ~s",
+						  [Msg, To, N, Pid, Ident])}
+			end, {1, ["PRIVMSG ", To, " :Loaded modules:"]}, L),
 			Contact ! {raw, T}
 	after 1500 ->
-		Contact ! {raw, "PRIVMSG " ++ To ++ " :(timeout)"}
+		Contact ! {raw, ["PRIVMSG ", To, " :(timeout)"]}
 	end.
 
 rmmod(To, [FirstParam | _], Contact) ->
@@ -168,18 +169,18 @@ rmmod(To, [FirstParam | _], Contact) ->
 			ModPid = lists:nth(N, L),
 			Contact ! {killmod, ModPid, self()},
 			Resp = receive {killmod, Msg} -> Msg after 500 -> "(timeout)" end,
-			Contact ! {raw, "PRIVMSG " ++ To ++ " :" ++ Resp}
+			Contact ! {raw, ["PRIVMSG ", To, " :", Resp]}
 	after 1500 ->
-		Contact ! {raw, "PRIVMSG " ++ To ++ " :(timeout)"}
+		Contact ! {raw, ["PRIVMSG ", To, " :(timeout)"]}
 	end.
 
 insmod(To, [ModName | Params], Contact) ->
 	Contact ! {insmod, ModName, Params, self()},
 	receive
 		{insmod, Resp} ->
-			Contact ! {raw, "PRIVMSG " ++ To ++ " :" ++ Resp}
+			Contact ! {raw, ["PRIVMSG ", To, " :", Resp]}
 	after 1500 ->
-		Contact ! {raw, "PRIVMSG " ++ To ++ " :(timeout)"}
+		Contact ! {raw, ["PRIVMSG ", To, " :(timeout)"]}
 	end.
 
 reload(To, [FirstParam | _], Contact) ->
@@ -189,9 +190,9 @@ reload(To, [FirstParam | _], Contact) ->
 		{mods, L} ->
 			lists:nth(N, L) ! {reload, self()},
 			Resp = receive reloaded -> "module reloaded successfully" after 2500 -> "(timeout)" end,
-			Contact ! {raw, "PRIVMSG " ++ To ++ " :" ++ Resp}
+			Contact ! {raw, ["PRIVMSG ", To, " :", Resp]}
 	after 1500 ->
-		Contact ! {raw, "PRIVMSG " ++ To ++ " :(timeout)"}
+		Contact ! {raw, ["PRIVMSG ", To, " :(timeout)"]}
 	end.
 
 strip_crlf(Str) ->

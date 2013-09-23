@@ -14,7 +14,7 @@ ircproc(Contact) ->
 	receive
 		quit -> quit;
 		{incoming, <<"PING :", Data/binary>>} ->
-			Contact ! {raw, "PONG :" ++ binary_to_list(Data)},
+			Contact ! {raw, ["PONG :", Data]},
 			ircproc(Contact);
 		{ident, Pid} ->
 			Pid ! {ident, "pong"},
