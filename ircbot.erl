@@ -111,8 +111,8 @@ send(Socket, Text) ->
     gen_tcp:send(Socket, [Text, "\r\n"]).
 
 send_init(Socket, Channel) ->
-    send(Socket, ["USER ", ?NICK, " dummy-host dummy-server :", ?FULL_NAME]),
-    send(Socket, ["NICK ", ?NICK]),
+    send(Socket, "USER " ?NICK " dummy-host dummy-server :" ?FULL_NAME),
+    send(Socket, "NICK " ?NICK),
     send(Socket, ["JOIN ", Channel]).
 
 quit(Socket, QuitCommand) ->
