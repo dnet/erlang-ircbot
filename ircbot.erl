@@ -29,8 +29,7 @@ start(Channel, Host, Port) ->
 start(Channel, Host, Port, Modules) ->
 	Socket = connect(Channel, Host, Port),
 	Master = self(),
-	ModPids = lists:map(
-		fun({M, P}) -> apply(M, ircmain, [Master | P]) end, Modules),
+	ModPids = [apply(M, ircmain, [Master | P]) || {M, P} <- Modules],
 	master(#ms{channel = Channel, modpids = ModPids,
 		socket = Socket, host = Host, port = Port}).
 
